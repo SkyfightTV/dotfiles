@@ -326,7 +326,6 @@ foreach ($extension in $code_extensions) {
 }
 
 Write-ScriptMessage "Installing remaining apps"
-scoop install spotify
 scoop install everything-lite
 
 Write-ScriptMessage "Removing desktop shortcuts"
@@ -339,6 +338,23 @@ if ($wsl) {
   Write-ScriptMessage "Installing WSL"
   wsl.exe --install
 }
+
+# Chemin du script PowerShell à exécuter au démarrage
+$scriptPath = ".\StartScript.ps1"
+
+# Nom de la tâche planifiée
+$taskName = "RunScriptAtStartup"
+
+# Créer une tâche planifiée pour exécuter le script au démarrage
+$action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument "-ExecutionPolicy Bypass -File '$scriptPath'"
+$trigger = New-ScheduledTaskTrigger -AtStartup
+Register-ScheduledTask -Action $action -Trigger $trigger -TaskName $taskName -User "NT AUTHORITY\SYSTEM"
+
+# Lister les tâches planifiées pour vérification
+Get-ScheduledTask | Where-Object { $_.TaskName -eq $taskName }
+
+Write-Host "Tâche planifiée créée avec succès pour exécuter le script au démarrage."
+
 
 Write-ScriptMessage "You can now reboot, press any key to continue"
 Read-Host
