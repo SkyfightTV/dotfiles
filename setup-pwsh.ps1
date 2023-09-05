@@ -51,6 +51,7 @@ scoop bucket add main
 scoop install main/python
 scoop install main/nodejs-lts
 scoop install main/aws
+scoop install main/git
 scoop bucket add extras
 scoop install extras/opera
 scoop install extras/deepl
