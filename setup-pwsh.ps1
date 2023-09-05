@@ -43,50 +43,56 @@ function Remove-PinnedProgram {
 $ProgressPreference = "SilentlyContinue";
 
 #
-# Firefox
+# Opera
 #
 
-Write-ScriptMessage "Installing firefox"
+Write-ScriptMessage "Installing apps"
+scoop bucket add main
+scoop install main/python
+scoop install main/nodejs-lts
+scoop install main/aws
 scoop bucket add extras
-scoop install firefox
-# Set firefox to use profile Scoop
-firefox -P "Scoop"
+scoop install extras/opera
+scoop install extras/deepl
+scoop install extras/gitkraken
+scoop install extras/googlechrome
+scoop install extras/jetbrains-toolbox
+scoop install extras/microsoft-teams
+scoop install extras/notion
+scoop install extras/teamspeak3
+scoop install extras/telegram
+scoop install extras/termius
+scoop install extras/vlc
+scoop install extras/windirstat
+scoop install extras/winrar
+scoop install extras/zoom
+scoop install extras/notepadplusplus
+scoop install extras/slack
+scoop install extras/f.lux
+scoop bucket add games
+scoop install games/epic-games-launcher
+scoop install games/goggalaxy
+scoop bucket add nonportable
+scoop install nonportable/office-365-apps-np
+scoop install nonportable/nvidia-display-driver-np
+scoop bucket add versions
+scoop install versions/steam
 
-Write-ScriptMessage "Copying Firefox settings"
-Copy-Item -Force .\firefox\user.js $env:USERPROFILE\scoop\persist\firefox\profile\
-Write-ScriptMessage "Installing Firefox extensions"
-Add-Type -assembly "System.IO.Compression.FileSystem"
-New-Item -Force -ItemType Directory -Path "$env:USERPROFILE\scoop\persist\firefox\distribution\extensions"
-Push-Location .\firefox\extensions
-$firefox_extensions = @(
-  "https://addons.mozilla.org/firefox/downloads/file/4046830/adguard_adblocker-4.1.53.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/4078007/betterttv-7.5.3.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/4053589/darkreader-4.9.62.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/3837108/jelly_party-1.7.3.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/4085308/sponsorblock-5.3.1.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/4030629/tampermonkey-4.18.1.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/4082096/1password_x_password_manager-2.8.1.xpi",
-  "https://addons.mozilla.org/firefox/downloads/file/3848483/youtube_nonstop-0.9.1.xpi"
-)
-foreach ($extension in $firefox_extensions) {
-  Write-ScriptMessage "Installing Firefox extension $extension"
-  $filename = $(Split-Path $extension -Leaf)
-  Invoke-WebRequest -Uri "$extension" -OutFile $filename
-  $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead("$(Get-Location)\$filename")
-  $manifestEntry = $extensionArchive.Entries | Where-Object { $_.FullName -eq "manifest.json" }
-  $manifestStream = $manifestEntry.Open()
-  $manifestReader = New-Object System.IO.StreamReader($manifestStream)
-  $manifest = $manifestReader.ReadToEnd() | ConvertFrom-Json
-  $manifestStream.Close()
-  $extensionArchive.Dispose()
-  if ($null -ne $manifest.applications) {
-      $extensionId = $manifest.applications.gecko.id
-  } elseif ($null -ne $manifest.browser_specific_settings) {
-      $extensionId = $manifest.browser_specific_settings.gecko.id
-  }
-  Copy-Item -Force $filename "$env:USERPROFILE\scoop\persist\firefox\distribution\extensions\$extensionId.xpi"
-}
-Pop-Location
+#
+# Discord
+#
+# Define the URL for the Discord installer
+$DiscordInstallerUrl = "https://discord.com/api/download?platform=win"
+
+# Define the path where you want to save the installer
+$InstallerPath = "C:\Users\antoi\OneDrive - Epitech\Bureau\DiscordInstaller.exe"
+
+# Download the Discord installer
+Invoke-WebRequest -Uri $DiscordInstallerUrl -OutFile $InstallerPath
+
+# Start the installation process
+Start-Process -FilePath $InstallerPath -Wait
+iwr "https://raw.githubusercontent.com/Vencord/Installer/main/install.ps1" -UseBasicParsing | iex
 
 #
 # Default apps
@@ -137,8 +143,8 @@ Set-RegistryValue -Path "HKCU:Control Panel\Mouse" -Name "MouseSpeed" -Value "0"
 Write-ScriptMessage "Disabling Windows 11 context menu"
 New-Item -Force -Path "HKCU:Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -ItemType Key
 
-Write-ScriptMessage "Disabling Recycle bin shortcut on Desktop"
-Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{645FF040-5081-101B-9F08-00AA002F954E}" -Value 1 -Type "DWord"
+# Write-ScriptMessage "Disabling Recycle bin shortcut on Desktop"
+# Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{645FF040-5081-101B-9F08-00AA002F954E}" -Value 1 -Type "DWord"
 
 Write-ScriptMessage "Disabling Recycle bin on all drives"
 Get-ChildItem "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume" |
