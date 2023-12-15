@@ -123,13 +123,13 @@ Set-RegistryValue -Path "HKCU:Control Panel\Mouse" -Name "MouseThreshold1" -Valu
 Set-RegistryValue -Path "HKCU:Control Panel\Mouse" -Name "MouseThreshold2" -Value "0" -Type "String"
 Set-RegistryValue -Path "HKCU:Control Panel\Mouse" -Name "MouseSpeed" -Value "0" -Type "String"
 
-Write-ScriptMessage "Disabling Recycle bin shortcut on Desktop"
-Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{645FF040-5081-101B-9F08-00AA002F954E}" -Value 1 -Type "DWord"
+#Write-ScriptMessage "Disabling Recycle bin shortcut on Desktop"
+#Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{645FF040-5081-101B-9F08-00AA002F954E}" -Value 1 -Type "DWord"
 
 Write-ScriptMessage "Disabling Recycle bin on all drives"
 Get-ChildItem "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume" |
 Foreach-Object { Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\$(Split-Path $_ -Leaf)" -Name "NukeOnDelete" -Value 1 -Type "DWord" }
-  
+
 Write-ScriptMessage "Removing Taskbar default icons"
 Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0 -Type "DWord"
 Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0 -Type "DWord"
@@ -291,51 +291,36 @@ Set-RegistryValue -Path "HKCU:Console\%%Startup" -Name "DelegationConsole" -Valu
 Set-RegistryValue -Path "HKCU:Console\%%Startup" -Name "DelegationTerminal" -Value "{E12CFF52-A866-4C77-9A90-F570A7AA2C6B}" -Type "String"
 
 #
-# Firefox
+# Opera
 #
 
-Write-ScriptMessage "Installing firefox"
+Write-ScriptMessage "Installing apps"
+scoop bucket add main
+scoop install main/python
+scoop install main/nodejs-lts
+scoop install main/aws
+scoop install main/git
 scoop bucket add extras
-scoop install firefox
-# Set firefox to use profile Scoop
-firefox -P "Scoop"
-
-Write-ScriptMessage "Copying Firefox settings"
-Copy-Item -Force .\firefox\user.js $env:USERPROFILE\scoop\persist\firefox\profile\
-
-if ($FirefoxExtensions) {
-  Write-ScriptMessage "Installing Firefox extensions"
-  Add-Type -assembly "System.IO.Compression.FileSystem"
-  New-Item -Force -ItemType Directory -Path "$env:USERPROFILE\scoop\persist\firefox\distribution\extensions"
-  Push-Location .\firefox\extensions
-  $firefox_extensions = @(
-    "https://addons.mozilla.org/firefox/downloads/file/4132587/mal_sync-0.9.5.xpi",
-    "https://addons.mozilla.org/firefox/downloads/file/4149786/nordvpn_proxy_extension-3.3.0.xpi",
-    "https://addons.mozilla.org/firefox/downloads/file/4156117/proton_pass-1.5.4.xpi",
-    "https://addons.mozilla.org/firefox/downloads/file/4164297/coupert-6.1.48.xpi",
-    "https://addons.mozilla.org/firefox/downloads/file/4138833/adguard_adblocker-4.1.57.xpi",
-    "https://addons.mozilla.org/firefox/downloads/file/4163966/sponsorblock-5.4.19.xpi"
-  )
-  foreach ($extension in $firefox_extensions) {
-    Write-ScriptMessage "Installing Firefox extension $extension"
-    $filename = $(Split-Path $extension -Leaf)
-    Invoke-WebRequest -Uri "$extension" -OutFile $filename
-    $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead("$(Get-Location)\$filename")
-    $manifestEntry = $extensionArchive.Entries | Where-Object { $_.FullName -eq "manifest.json" }
-    $manifestStream = $manifestEntry.Open()
-    $manifestReader = New-Object System.IO.StreamReader($manifestStream)
-    $manifest = $manifestReader.ReadToEnd() | ConvertFrom-Json
-    $manifestStream.Close()
-    $extensionArchive.Dispose()
-    if ($null -ne $manifest.browser_specific_settings) {
-      $extensionId = $manifest.browser_specific_settings.gecko.id
-    } elseif ($null -ne $manifest.applications) {
-        $extensionId = $manifest.applications.gecko.id
-    }
-    Copy-Item -Force $filename "$env:USERPROFILE\scoop\persist\firefox\distribution\extensions\$extensionId.xpi"
-  }
-  Pop-Location
-}
+scoop install extras/opera
+scoop install extras/deepl
+scoop install extras/notion
+scoop install extras/telegram
+scoop install extras/termius
+scoop install extras/vlc
+scoop install extras/winrar
+scoop install extras/zoom
+scoop install extras/slack
+scoop install extras/f.lux
+scoop install extras/everything-lite
+scoop install extras/slack
+scoop bucket add games
+scoop install games/epic-games-launcher
+scoop install games/goggalaxy
+scoop bucket add nonportable
+scoop install nonportable/office-365-apps-np
+scoop bucket add versions
+scoop install versions/steam
+scoop install versions/ubisoftconnect
 
 #
 # Discord
