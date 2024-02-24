@@ -1,0 +1,1 @@
+Checkpoint-Computer -Description '[SETUP SCRIPT] Before installation' -RestorePointType 'MODIFY_SETTINGS'

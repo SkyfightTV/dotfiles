@@ -1,14 +1,3 @@
-param(
-  [switch]$SecondStep,
-  [switch]$KeepOneDrive,
-  [switch]$GitConfig,
-  [string]$SSHFolder,
-  [string]$GPGKey,
-  [switch]$FirefoxExtensions,
-  [switch]$VSCode,
-  [switch]$WSL
-)
-
 function Write-ScriptMessage {
   param (
       [String]$Message
@@ -17,22 +6,52 @@ function Write-ScriptMessage {
   Write-Host "[SETUP SCRIPT] $Message" -ForegroundColor Green
 }
 
-function Invoke-Code {
-  param(
-      [string]$Code
+function Set-RegistryValue {
+  param (
+    [String]$Path,
+    [String]$Name,
+    $Value,
+    [String]$Type
   )
 
-  $scriptBlock = [scriptblock]::Create($Code)
-  Start-Process powershell.exe -ArgumentList "-NoProfile -NoExit -Command $scriptBlock" -PassThru
+  $key = Get-Item -Path $Path -ErrorAction SilentlyContinue
+  if ($null -eq $key) {
+    New-Item -Path $Path -ItemType Key -Force
+  }
+
+  $reg = Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue
+  if ($null -eq $reg) {
+    New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType $Type -Force
+  } else {
+    Set-ItemProperty -Path $Path -Name $Name -Value $Value -Force
+  }
 }
 
-function Launch-AndCloseWhenReady {
+function Invoke-Code {
+  param(
+      [string]$Code,
+      [bool]$RunAs = $false,
+      [bool]$ExitNoError = $false
+  )
+
+  $arguments = ""
+  if ($ExitNoError) {
+    $arguments += " -ErrorAction SilentlyContinue"
+  }
+  if ($RunAs) {
+    $arguments += " -Verb RunAs"
+  }
+  $arguments += " -NoExit"
+
+  $scriptBlock = [scriptblock]::Create($Code)
+
+  Start-Process powershell.exe -ArgumentList "$arguments -Command `"$scriptBlock`"" -PassThru
+}
+
+function Wait-AndCloseWhenReady {
   param(
       [string]$ProgramName
   )
-
-  Start-Process $ProgramName
-
   do {
       Start-Sleep -Seconds 1
       $process = Get-Process -Name $ProgramName -ErrorAction SilentlyContinue
@@ -49,31 +68,43 @@ function Launch-AndCloseWhenReady {
 function Install-ApplicationFromURL {
   param(
       [string]$ApplicationName,
-      [string]$DownloadURL
+      [string]$DownloadURL,
+      [bool]$MSIX = $false
   )
-
-  Invoke-Code "
   $downloadPath = "$env:TEMP\$ApplicationName.exe"
   try {
       Invoke-WebRequest -Uri $DownloadURL -OutFile $downloadPath -ErrorAction Stop
-      Write-Host "Download of $ApplicationName completed."
+      Write-ScriptMessage "Download of $ApplicationName completed."
   } catch {
-      Write-Host "An error occurred while downloading $ApplicationName : $_"
+      Write-ScriptMessage "An error occurred while downloading $ApplicationName : $_"
       return
   }
   try {
+    if ($MSIX) {
+      Add-AppxPackage -Path $downloadPath -ErrorAction Stop
+    } else {
       Start-Process -FilePath $downloadPath -Wait -ErrorAction Stop
-      Write-Host "$ApplicationName has been successfully installed."
+    }
+    Write-ScriptMessage "$ApplicationName has been successfully installed."
   } catch {
-      Write-Host "An error occurred while installing $ApplicationName : $_"
+    Write-ScriptMessage "An error occurred while installing $ApplicationName : $_"
   }
-  Remove-Item -Path $downloadPath -ErrorAction SilentlyContinue"
+  Remove-Item -Path $downloadPath -ErrorAction SilentlyContinue
 }
 
 function Unpin-AllFromTaskbar {
   $shell = New-Object -ComObject "Shell.Application"
-  $taskbar = $shell.Namespace("shell:::{0}" -f (0xa))
+  $taskbar = $shell.NameSpace('shell:::{0}' -f (0x1))
+  if ($taskbar -eq $null) {
+    Write-ScriptMessage "Failed to retrieve the Taskbar."
+      return
+  }
+
   $taskbarItems = $taskbar.Items()
+  if ($taskbarItems -eq $null) {
+    Write-ScriptMessage "Failed to retrieve items from the Taskbar."
+      return
+  }
 
   foreach ($item in $taskbarItems) {
       $taskbar.InvokeVerb("Unpin from taskbar", $item)
@@ -86,7 +117,7 @@ function Pin-ToTaskbar {
       [string]$ProgramPath
   )
   $shell = New-Object -ComObject "Shell.Application"
-  $taskbar = $shell.Namespace("shell:::{0}" -f (0xa))
+  $taskbar = $shell.NameSpace('shell:::{0}' -f (0x1))
   $folderItem = $shell.Namespace((Get-Item $ProgramPath).DirectoryName).ParseName((Get-Item $ProgramPath).Name)
   $taskbar.InvokeVerb("Pin to taskbar", $folderItem)
   Write-ScriptMessage "$ProgramPath has been pinned to the taskbar."
@@ -107,12 +138,12 @@ function Pin-MicrosoftProgramToTaskbar {
     if ($programPath) {
         $folderItem = $shell.Namespace((Get-Item $programPath).DirectoryName).ParseName((Get-Item $programPath).Name)
         $taskbar.InvokeVerb("Pin to taskbar", $folderItem)
-        Write-Host "$ProgramName has been pinned to the taskbar."
+        Write-ScriptMessage "$ProgramName has been pinned to the taskbar."
     } else {
-        Write-Host "Program '$ProgramName' not found in the Start menu."
+      Write-ScriptMessage "Program '$ProgramName' not found in the Start menu."
     }
   } catch {
-      Write-Host "An error occurred while pinning $ProgramName to the taskbar: $_"
+    Write-ScriptMessage "An error occurred while pinning $ProgramName to the taskbar: $_"
   }
 }
 
@@ -127,13 +158,18 @@ function Create-FileOnDesktop {
 
     try {
         Set-Content -Path $filePath -Value $FileContent
-        Write-Host "Le fichier $FileName a été créé sur le bureau avec succès."
+        Write-ScriptMessage "Le fichier $FileName a été créé sur le bureau avec succès."
     } catch {
-        Write-Host "Une erreur s'est produite lors de la création du fichier $FileName : $_"
+      Write-ScriptMessage "Une erreur s'est produite lors de la création du fichier $FileName : $_"
     }
 }
 
-Checkpoint-Computer -Description "[SETUP SCRIPT] Before installation" -RestorePointType "MODIFY_SETTINGS"
+if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+  Write-ScriptMessage "This script not requires administrator privileges. Starting without it."
+  Exit
+}
+
+Start-Process powershell.exe -ArgumentList "-NoProfile -File `"restore-point.ps1`" -NoExit" -Verb RunAs
 
 Write-ScriptMessage "PART 1 : Fixing Windows 11"
 Write-ScriptMessage "Disabling Mouse acceleration"
@@ -162,15 +198,27 @@ Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Themes\P
 Set-RegistryValue -Path "HKCU:Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0 -Type "DWord"
 
 Write-ScriptMessage "Removing desktop shortcuts"
-Get-ChildItem $env:USERPROFILE\Desktop\*.lnk | ForEach-Object {
+$desktop = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+Get-ChildItem $desktop\*.lnk | ForEach-Object {
   Write-ScriptMessage "Removing desktop shortcut $_.FullName"
   Remove-Item -Path $_.FullName
 }
 
 Write-ScriptMessage "Part 2 : Installation"
-Invoke-RestMethod get.scoop.sh | Invoke-Expression
-
+if (-not (Test-Path $env:USERPROFILE\scoop)) {
+  Invoke-RestMethod get.scoop.sh | Invoke-Expression
+}
 Write-ScriptMessage "Installing scoop buckets"
+
+function Test-ScoopBucket {
+  param (
+      [string]$BucketName
+  )
+  $BucketsDir = Join-Path $env:USERPROFILE "scoop/buckets"
+  $BucketExists = Test-Path (Join-Path $BucketsDir $BucketName)
+  return $BucketExists
+}
+
 $scoopBuckets = @(
   "extras",
   "games",
@@ -178,17 +226,28 @@ $scoopBuckets = @(
   "nonportable",
   "versions"
 )
-Invoke-Code "
 foreach ($scoopBucket in $scoopBuckets) {
-  Write-ScriptMessage "Adding scoop bucket $scoopBucket"
-  scoop bucket add $scoopBucket
-}"
+  if (-not (Test-ScoopBucket $scoopBucket)) {
+    Write-ScriptMessage "Adding scoop bucket $scoopBucket"
+    scoop bucket add $scoopBucket
+  } else {
+    Write-ScriptMessage "Scoop bucket $scoopBucket already exists"
+  }
+}
 
 Write-ScriptMessage "Installing scoop packages"
+$packageList = scoop list
+function Test-ScoopPackage {
+  param (
+        [string]$PackageName
+    )
+    $Package = $PackageName -replace "^[^/]+/", ""
+    $PackageExists = $packageList | Select-String -Pattern $Package
+    return [bool]$PackageExists
+}
 $scoopPackages = @(
   'main/python',
   'main/nodejs-lts',
-  'main/aws',
   'main/git',
   'main/maven',
   'main/pwsh',
@@ -200,6 +259,7 @@ $scoopPackages = @(
   'extras/everything-lite',
   'extras/jetbrains-toolbox',
   'extras/vscode',
+  'extras/discord',
   'games/epic-games-launcher',
   'games/goggalaxy',
   'games/steam',
@@ -207,25 +267,32 @@ $scoopPackages = @(
   'extras/gog-galaxy-plugin-downloader',
   'nonportable/office-365-apps-np',
   'versions/ubisoftconnect',
-  'nerd-fonts/CascadiaCode-NF-Mono',
+  'nerd-fonts/CascadiaCode-NF-Mono -g'
 )
-Invoke-Code "
 foreach ($scoopPackage in $scoopPackages) {
-  Write-ScriptMessage "Installing scoop package $scoopPackage"
-  scoop install $scoopPackage
-}"
+  if (-not (Test-ScoopPackage $scoopPackage)) {
+    Write-ScriptMessage "Installing scoop package $scoopPackage"
+    scoop install $scoopPackage
+  } else {
+    Write-ScriptMessage "Scoop package $scoopPackage already installed but will be updated"
+    scoop update $scoopPackage
+  }
+}
 Start-Process pwsh -Verb runAs -Args "-ExecutionPolicy Bypass $($MyInvocation.Line) -SecondStep"
 Start-Process DISM -Args "/online /disable-feature /featurename:WindowsMediaPlayer"
 
 Write-ScriptMessage "Installing Vencord"
-Invoke-Code "
-Launch-AndCloseWhenReady "discord"
-Invoke-WebRequest 'https://raw.githubusercontent.com/Vencord/Installer/main/install.ps1' -UseBasicParsing | Invoke-Expression"
+Start-Process -FilePath "c:\Users\antoi\AppData\Local\Discord\Update.exe" -ArgumentList "--processStart Discord.exe"
+Wait-AndCloseWhenReady "discord"
+Invoke-WebRequest 'https://raw.githubusercontent.com/Vencord/Installer/main/install.ps1' -UseBasicParsing | Invoke-Expression
 
 Write-ScriptMessage "Installing WSL"
-wsl.exe --install
+Invoke-Code "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart" -RunAs $true
+Invoke-WebRequest -Uri "https://aka.ms/wslubuntu2004" -OutFile "$env:USERPROFILE\Ubuntu.appx" -UseBasicParsing
+Add-AppxPackage "$env:USERPROFILE\Ubuntu.appx"
+Remove-Item "$env:USERPROFILE\Ubuntu.appx"
 
-Install-ApplicationFromURL "TradingView" "https://tvd-packages.tradingview.com/stable/latest/win32/TradingView.msix"
+Install-ApplicationFromURL "TradingView" "https://tvd-packages.tradingview.com/stable/latest/win32/TradingView.msix" -MSIX $true
 Install-ApplicationFromURL "Quantower" "https://updates.quantower.com/Quantower/x64/latest/Quantower.exe"
 Install-ApplicationFromURL "1password" "https://downloads.1password.com/win/1PasswordSetup-latest.exe"
 Install-ApplicationFromURL "SteelSeries GG" "https://engine.steelseriescdn.com/SteelSeriesGG57.0.0Setup.exe"
@@ -257,7 +324,6 @@ reg import "$env:USERPROFILE\scoop\apps\vscode\current\install-associations.reg"
 Write-ScriptMessage "Copying up VSCode settings"
 New-Item -Force -ItemType Directory -Path $env:USERPROFILE\scoop\persist\vscode\data\user-data\User\
 Copy-Item -Force .\vscode\settings.json $env:USERPROFILE\scoop\persist\vscode\data\user-data\User\
-Copy-Item -Force .\vscode\keybindings.json $env:USERPROFILE\scoop\persist\vscode\data\user-data\User\
 
 Write-ScriptMessage "Installing VSCode extensions"
 $code_extensions = @(
@@ -274,12 +340,11 @@ $code_extensions = @(
   "github.copilot",
   "github.copilot-chat",
   "tal7aouy.rainbow-bracket",
-  "shardulm94.trailing-spaces",
+  "shardulm94.trailing-spaces"
 )
-Invoke-Code "
 foreach ($extension in $code_extensions) {
   code --install-extension $extension
-}"
+}
 
 Write-ScriptMessage "Setting up Taskbar"
 Unpin-AllFromTaskbar
@@ -292,8 +357,7 @@ Pin-ToTaskbar -ProgramPath "C:\Users\antoi\scoop\apps\notion\current\Notion.exe"
 Pin-ToTaskbar -ProgramPath "C:\Users\antoi\AppData\Local\1Password\app\8\1Password.exe"
 
 Write-ScriptMessage "Setting up Gog Galaxy"
-Invoke-Code "gog-plugins-downloader.exe -p steam,battlenet"
-
+gog-plugins-downloader.exe -p steam,battlenet
 
 Write-ScriptMessage "Part 4: Installing drivers"
 Install-ApplicationFromURL "AMD Radeon Software" "https://drivers.amd.com/drivers/installer/23.40/whql/amd-software-adrenalin-edition-24.1.1-combined-minimalsetup-240122_web.exe"
