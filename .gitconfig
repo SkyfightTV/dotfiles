@@ -1,12 +1,18 @@
-[user]
-	name = raxl8
-	email = 32034076+raxl8@users.noreply.github.com
-	signingkey = 259A9A972AC7A0B1
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	program = C:\\Users\\antoi\\AppData\\Local\\1Password\\app\\8\\op-ssh-sign.exe
 [commit]
 	gpgsign = true
-[push]
-	default = current
+[user]
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJYXk44eCPqmlAL+hcsvRuoQG3U5jETm8DsaFr0Hpju6
+	email = antoine.berger@epitech.eu
+	name = SkyfightTV
+[safe]
+	directory = C:/Users/antoi/scoop/buckets/versions
+	directory = C:/Users/antoi/scoop/buckets/nonportable
+	directory = C:/Users/antoi/scoop/buckets/games
+	directory = C:/Users/antoi/scoop/buckets/extras
+	directory = C:/Users/antoi/scoop/buckets/nerd-fonts
 [core]
-    autocrlf = false
-[init]
-    defaultBranch = main
+	autocrlf = true

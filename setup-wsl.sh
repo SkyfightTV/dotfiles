@@ -3,7 +3,6 @@
 touch $HOME/.hushlogin
 sudo apt update
 sudo apt upgrade
-sudo apt install neovim
 sudo apt-add-repository ppa:fish-shell/release-3
 sudo apt install fish
 chsh -s /usr/bin/fish
@@ -12,13 +11,6 @@ Relaunch shell
 # Copy config of fish
 curl -sS https://starship.rs/install.sh | sh
 # Copy starship config to ~/.config/starship.toml
-
-# Copy ssh keys to ~/.ssh
-chmod 600 $HOME/.ssh/id_rsa $HOME/.ssh/id_rsa.pub
-
-gpg --import key.pk
-echo -e "pinentry-program \"/mnt/c/Users/raxl8/scoop/apps/git/current/usr/bin/pinentry.exe\"\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000" | tee -a $HOME/.gnupg/gpg-agent.conf
-gpgconf --reload gpg-agent
 
 sudo apt-get install ca-certificates curl gnupg
 sudo mkdir -m 0755 -p /etc/apt/keyrings
