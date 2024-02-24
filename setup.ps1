@@ -310,6 +310,7 @@ TODO:
 - [ ] Add games on GOG Galaxy
 - [ ] Start OneDrive sync
 - [ ] Update drivers with DriversCloud
+- [ ] Fix ssh with 1Password
 
 ## Software installed
 - [x] Opera
